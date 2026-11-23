@@ -1,0 +1,921 @@
+#include <iostream>
+#include <string>
+#include <vector>
+#include <fstream>
+#include <sstream>
+using namespace std;
+
+class Validation
+{
+public:
+    static bool validName(string name) {
+        if (name.length() < 3 || name.length() > 20 || name[0] == ' ' || name[name.length() - 1] == ' ')
+            return false;
+        bool previousSpace = false;
+        for (int i = 0; i < (int)name.length(); i++) {
+            char c = name[i];
+            if (c == ' ') {
+                if (previousSpace) return false;
+                previousSpace = true;
+            }
+            else if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z'))
+                previousSpace = false;
+            else
+                return false;
+        }
+        return true;
+    }
+    static bool validPass(string pass) {
+        if (pass.length() < 8 || pass.length() > 20)
+            return false;
+        for (int i = 0; i < pass.length(); i++) {
+            if (pass[i] == ' ')
+                return false;
+        }
+        return true;
+    }
+    static bool validBalance(double balance) {
+        return balance >= 1500;
+    }
+    static bool validSalary(double salary) {
+        return salary >= 5000;
+    }
+};
+
+class Person
+{
+protected:
+    int id;
+    string name;
+    string pass;
+public:
+    Person(int id = 0, string name = "", string pass = "") {
+        this->id = id;
+        this->name = name;
+        this->pass = pass;
+    }
+
+    int getId() { return id; }
+    string getName() { return name; }
+    string getPass() { return pass; }
+
+    void setId(int id) { this->id = id; }
+    void setName(string name) {
+        if (Validation::validName(name))
+            this->name = name;
+        else
+            cout << "Invalid name." << endl;
+    }
+    void setPass(string pass) {
+        if (Validation::validPass(pass))
+            this->pass = pass;
+        else
+            cout << "Invalid password." << endl;
+    }
+    void display() {
+        cout << "ID : " << id << endl;
+        cout << "Name : " << name << endl;
+        cout << "Password : " << pass << endl;
+    }
+};
+
+class Client : public Person
+{
+private:
+    double balance;
+public:
+    Client(int id = 0, string name = "", string pass = "", double balance = 1500)
+        : Person(id, name, pass) {
+        if (Validation::validBalance(balance))
+            this->balance = balance;
+        else
+            this->balance = 1500;
+    }
+
+    double getBalance() { return balance; }
+    void setBalance(double balance) {
+        if (Validation::validBalance(balance))
+            this->balance = balance;
+        else
+            cout << "Invalid balance." << endl;
+    }
+    void deposit(double amount) {
+        if (amount <= 0) {
+            cout << "Invalid amount." << endl;
+            return;
+        }
+        balance += amount;
+        cout << "Deposit successful." << endl;
+    }
+    void withdraw(double amount) {
+        if (amount <= 0 || balance - amount < 1500) {
+            cout << "Withdrawal failed." << endl;
+            return;
+        }
+        balance -= amount;
+        cout << "Withdrawal successful." << endl;
+    }
+    void transferTo(double amount, Client& recipient) {
+        if (amount <= 0 || balance - amount < 1500) {
+            cout << "Transfer failed." << endl;
+            return;
+        }
+        balance -= amount;
+        recipient.balance += amount;
+        cout << "Transfer successful." << endl;
+    }
+    void display() {
+        Person::display();
+        cout << "Balance : " << balance << endl;
+    }
+};
+
+class Employee : public Person
+{
+protected:
+    double salary;
+public:
+    Employee(int id = 0, string name = "", string pass = "", double salary = 5000)
+        : Person(id, name, pass) {
+        if (Validation::validSalary(salary))
+            this->salary = salary;
+        else
+            this->salary = 5000;
+    }
+
+    double getSalary() { return salary; }
+    void setSalary(double salary) {
+        if (Validation::validSalary(salary))
+            this->salary = salary;
+        else
+            cout << "Invalid salary." << endl;
+    }
+    void display() {
+        Person::display();
+        cout << "Salary : " << salary << endl;
+    }
+
+    void addClient(Client& client);
+    Client* searchClient(int id);
+    void listClient();
+    void editClient(int id, string name, string password, double balance);
+};
+
+class Admin : public Employee
+{
+public:
+    Admin(int id = 0, string name = "", string password = "", double salary = 5000)
+        : Employee(id, name, password, salary) {
+    }
+
+    void addClient(Client& client);
+    Client* searchClient(int id);
+    void listClient();
+    void editClient(int id, string name, string password, double balance);
+
+    void addEmployee(Employee& employee);
+    Employee* searchEmployee(int id);
+    void editEmployee(int id, string name, string pass, double salary);
+    void listEmployee();
+};
+
+// Phase 2
+vector<Client> allClients;
+vector<Employee> allEmployees;
+vector<Admin> allAdmins;
+
+class Parser
+{
+public:
+    static vector<string> split(string line) {
+        vector<string> data;
+        string word;
+        // Read both the old format (&) and the new format (-).
+        char separator = (line.find('&') != string::npos) ? '&' : '-';
+        for (int i = 0; i < (int)line.length(); i++) {
+            if (line[i] == separator) {
+                data.push_back(word);
+                word = "";
+            }
+            else {
+                word += line[i];
+            }
+        }
+        data.push_back(word);
+        return data;
+    }
+    static Client parseToClient(string line) {
+        vector<string> d = split(line);
+        if (d.size() != 4) return Client();
+        return Client(stoi(d[0]), d[1], d[2], stod(d[3]));
+    }
+    static Employee parseToEmployee(string line) {
+        vector<string> d = split(line);
+        if (d.size() != 4) return Employee();
+        return Employee(stoi(d[0]), d[1], d[2], stod(d[3]));
+    }
+    static Admin parseToAdmin(string line) {
+        vector<string> d = split(line);
+        if (d.size() != 4) return Admin();
+        return Admin(stoi(d[0]), d[1], d[2], stod(d[3]));
+    }
+};
+
+class FilesHelper
+{
+public:
+    static void saveLast(string fileName, int id) {
+        ofstream file(fileName);
+        file << id;
+        file.close();
+    }
+    static int getLast(string fileName) {
+        int id = 0;
+        ifstream file(fileName);
+        file >> id;
+        file.close();
+        return id;
+    }
+    static void saveClient(Client c) {
+        ofstream file("Clients.txt", ios::app);
+        file << c.getId() << "-"
+            << c.getName() << "-"
+            << c.getPass() << "-"
+            << c.getBalance() << endl;
+        file.close();
+        saveLast("ClientLastId.txt", c.getId());
+    }
+    static void saveEmployee(string fileName, string lastIdFile, Employee e) {
+        ofstream file(fileName, ios::app);
+        file << e.getId() << "-"
+            << e.getName() << "-"
+            << e.getPass() << "-"
+            << e.getSalary() << endl;
+        file.close();
+        saveLast(lastIdFile, e.getId());
+    }
+    static void saveAdmin(Admin a) {
+        ofstream file("Admins.txt", ios::app);
+        file << a.getId() << "-"
+            << a.getName() << "-"
+            << a.getPass() << "-"
+            << a.getSalary() << endl;
+        file.close();
+        saveLast("AdminLastId.txt", a.getId());
+    }
+    static void getClients() {
+        allClients.clear();
+        ifstream file("Clients.txt");
+        string line;
+        while (getline(file, line)) {
+            if (line != "") {
+                try { allClients.push_back(Parser::parseToClient(line)); }
+                catch (...) { cout << "Skipping invalid client record in Clients.txt" << endl; }
+            }
+        }
+        file.close();
+    }
+    static void getEmployees() {
+        allEmployees.clear();
+        ifstream file("Employees.txt");
+        string line;
+        while (getline(file, line)) {
+            if (line != "") {
+                try { allEmployees.push_back(Parser::parseToEmployee(line)); }
+                catch (...) { cout << "Skipping invalid employee record in Employees.txt" << endl; }
+            }
+        }
+        file.close();
+    }
+    static void getAdmins() {
+        allAdmins.clear();
+        ifstream file("Admins.txt");
+        string line;
+        while (getline(file, line)) {
+            if (line != "") {
+                try { allAdmins.push_back(Parser::parseToAdmin(line)); }
+                catch (...) { cout << "Skipping invalid admin record in Admins.txt" << endl; }
+            }
+        }
+        file.close();
+    }
+    static void clearFile(string fileName, string lastIdFile) {
+        ofstream file(fileName);
+        file.close();
+        saveLast(lastIdFile, 0);
+    }
+    static void saveAllClients() {
+        ofstream file("Clients.txt");
+        for (int i = 0; i < allClients.size(); i++) {
+            file << allClients[i].getId() << "-"
+                << allClients[i].getName() << "-"
+                << allClients[i].getPass() << "-"
+                << allClients[i].getBalance() << endl;
+        }
+        file.close();
+    }
+    static void saveAllEmployees() {
+        ofstream file("Employees.txt");
+        for (int i = 0; i < allEmployees.size(); i++) {
+            file << allEmployees[i].getId() << "-"
+                << allEmployees[i].getName() << "-"
+                << allEmployees[i].getPass() << "-"
+                << allEmployees[i].getSalary() << endl;
+        }
+        file.close();
+    }
+    static void saveAllAdmins() {
+        ofstream file("Admins.txt");
+        for (int i = 0; i < allAdmins.size(); i++) {
+            file << allAdmins[i].getId() << "-"
+                << allAdmins[i].getName() << "-"
+                << allAdmins[i].getPass() << "-"
+                << allAdmins[i].getSalary() << endl;
+        }
+        file.close();
+    }
+};
+
+class DataSourceInterface
+{
+public:
+    virtual void addClient(Client obj) = 0;
+    virtual void addEmployee(Employee obj) = 0;
+    virtual void addAdmin(Admin obj) = 0;
+    virtual void getAllClients() = 0;
+    virtual void getAllEmployees() = 0;
+    virtual void getAllAdmins() = 0;
+    virtual void removeAllClients() = 0;
+    virtual void removeAllEmployees() = 0;
+    virtual void removeAllAdmins() = 0;
+    virtual ~DataSourceInterface() {}
+};
+
+class FileManager : public DataSourceInterface
+{
+public:
+    void addClient(Client obj) {
+        FilesHelper::saveClient(obj);
+    }
+    void addEmployee(Employee obj) {
+        FilesHelper::saveEmployee("Employees.txt", "EmployeeLastId.txt", obj);
+    }
+    void addAdmin(Admin obj) {
+        FilesHelper::saveAdmin(obj);
+    }
+    void getAllClients() {
+        FilesHelper::getClients();
+    }
+    void getAllEmployees() {
+        FilesHelper::getEmployees();
+    }
+    void getAllAdmins() {
+        FilesHelper::getAdmins();
+    }
+    void removeAllClients() {
+        FilesHelper::clearFile("Clients.txt", "ClientLastId.txt");
+        allClients.clear();
+    }
+    void removeAllEmployees() {
+        FilesHelper::clearFile("Employees.txt", "EmployeeLastId.txt");
+        allEmployees.clear();
+    }
+    void removeAllAdmins() {
+        FilesHelper::clearFile("Admins.txt", "AdminLastId.txt");
+        allAdmins.clear();
+    }
+};
+
+void Employee::addClient(Client& client) {
+    client.setId(FilesHelper::getLast("ClientLastId.txt") + 1);
+    allClients.push_back(client);
+    FilesHelper::saveClient(client);
+}
+Client* Employee::searchClient(int id) {
+    for (int i = 0; i < allClients.size(); i++) {
+        if (allClients[i].getId() == id)
+            return &allClients[i];
+    }
+    return NULL;
+}
+void Employee::listClient() {
+    for (int i = 0; i < allClients.size(); i++) {
+        allClients[i].display();
+        cout << endl;
+    }
+}
+void Employee::editClient(int id, string name, string password, double balance) {
+    Client* c = searchClient(id);
+    if (c == NULL) {
+        cout << "Client not found." << endl;
+        return;
+    }
+    c->setName(name);
+    c->setPass(password);
+    c->setBalance(balance);
+    FilesHelper::saveAllClients();
+}
+
+void Admin::addClient(Client& client) {
+    Employee::addClient(client);
+}
+Client* Admin::searchClient(int id) {
+    return Employee::searchClient(id);
+}
+void Admin::listClient() {
+    Employee::listClient();
+}
+void Admin::editClient(int id, string name, string password, double balance) {
+    Employee::editClient(id, name, password, balance);
+}
+
+void Admin::addEmployee(Employee& employee) {
+    employee.setId(FilesHelper::getLast("EmployeeLastId.txt") + 1);
+    allEmployees.push_back(employee);
+    FilesHelper::saveEmployee("Employees.txt", "EmployeeLastId.txt", employee);
+}
+Employee* Admin::searchEmployee(int id) {
+    for (int i = 0; i < allEmployees.size(); i++) {
+        if (allEmployees[i].getId() == id)
+            return &allEmployees[i];
+    }
+    return NULL;
+}
+void Admin::editEmployee(int id, string name, string password, double salary) {
+    Employee* e = searchEmployee(id);
+    if (e == NULL) {
+        cout << "Employee not found." << endl;
+        return;
+    }
+    e->setName(name);
+    e->setPass(password);
+    e->setSalary(salary);
+    FilesHelper::saveAllEmployees();
+}
+void Admin::listEmployee() {
+    for (int i = 0; i < allEmployees.size(); i++) {
+        allEmployees[i].display();
+        cout << endl;
+    }
+}
+
+
+class FillData
+{
+public:
+    static bool fillClientData(string name, string password, double balance) {
+        return Validation::validName(name) &&
+            Validation::validPass(password) &&
+            Validation::validBalance(balance);
+    }
+
+    static bool fillEmployeeData(string name, string password, double salary) {
+        return Validation::validName(name) &&
+            Validation::validPass(password) &&
+            Validation::validSalary(salary);
+    }
+};
+
+// Phase 3
+class ClientManager
+{
+public:
+    static void printClientMenu() {
+        cout << "\n Client Menu " << endl;
+        cout << "1 Deposit" << endl;
+        cout << "2  Withdraw" << endl;
+        cout << "3 Transfer" << endl;
+        cout << "4 Check balance" << endl;
+        cout << "5 Display info" << endl;
+        cout << "6 Update password" << endl;
+        cout << "0 Logout" << endl;
+        cout << "Choice : ";
+
+    }
+    static void updatePassword(Person* person) {
+        string password;
+        cout << "Enter new password: ";
+        cin >> password;
+        if (!Validation::validPass(password)) {
+            cout << "Invalid password." << endl;
+            return;
+        }
+        person->setPass(password);
+        for (int i = 0; i < allClients.size(); i++) {
+            if (allClients[i].getId() == person->getId()) {
+                FilesHelper::saveAllClients();
+                return;
+            }
+        }
+    }
+    static Client* login(int id, string password) {
+        for (int i = 0; i < allClients.size(); i++) {
+            if (allClients[i].getId() == id && allClients[i].getPass() == password)
+                return &allClients[i];
+        }
+        return NULL;
+    }
+    static bool clientOptions(Client* client) {
+        int choice;
+        do {
+            printClientMenu();
+            cin >> choice;
+            switch (choice) {
+            case 1: {
+                double amount;
+                cout << "Amount: ";
+                cin >> amount;
+                client->deposit(amount);
+                FilesHelper::saveAllClients();
+                break;
+            }
+            case 2: {
+                double amount;
+                cout << "Amount: ";
+                cin >> amount;
+                client->withdraw(amount);
+                FilesHelper::saveAllClients();
+                break;
+            }
+            case 3: {
+                int id;
+                double amount;
+                cout << "Recipient ID: ";
+                cin >> id;
+                Client* recipient = NULL;
+                for (int i = 0; i < allClients.size(); i++) {
+                    if (allClients[i].getId() == id)
+                        recipient = &allClients[i];
+                }
+                if (recipient == NULL)
+                    cout << "Client not found." << endl;
+                else if (recipient == client)
+                    cout << "Cannot transfer to yourself." << endl;
+                else {
+                    cout << "Amount: ";
+                    cin >> amount;
+                    client->transferTo(amount, *recipient);
+                    FilesHelper::saveAllClients();
+                }
+                break;
+            }
+            case 4:
+                cout << "Balance: " << client->getBalance() << endl;
+                break;
+            case 5:
+                client->display();
+                break;
+            case 6:
+                updatePassword(client);
+                break;
+            case 0:
+                break;
+            default:
+                cout << "Invalid choice." << endl;
+            }
+        } while (choice != 0);
+        return true;
+    }
+};
+
+class EmployeeManager
+{
+public:
+    static void printEmployeMenu() {
+        cout << "\nEmployee Menu" << endl;
+        cout << "1 Add client" << endl;
+        cout << "2 List clients" << endl;
+        cout << "3 Search client" << endl;
+        cout << "4 Edit client" << endl;
+        cout << "5 Display my info" << endl;
+        cout << "0 Logout" << endl;
+        cout << "Choice : ";
+    }
+    static void newClient(Employee* employee) {
+        string name, password;
+        double balance;
+        cout << "Client name: ";
+        cin >> name;
+        cout << "Password: ";
+        cin >> password;
+        cout << "Starting balance: ";
+        cin >> balance;
+        if (!FillData::fillClientData(name, password, balance)) {
+            cout << "Invalid data. Client not added." << endl;
+            return;
+        }
+        Client c(0, name, password, balance);
+        employee->addClient(c);
+        cout << "Client added successfully. ID: " << c.getId() << endl;
+    }
+    static void listAllClients(Employee*) {
+        FilesHelper::getClients();
+        if (allClients.empty())
+            cout << "No clients found." << endl;
+        else {
+            for (int i = 0; i < allClients.size(); i++) {
+                allClients[i].display();
+                cout << endl;
+            }
+        }
+    }
+    static void searchForClient(Employee* employee) {
+        int id;
+        cout << "Client ID: ";
+        cin >> id;
+        Client* c = employee->searchClient(id);
+        if (c != NULL)
+            c->display();
+        else
+            cout << "Client not found." << endl;
+    }
+    static void editClientInfo(Employee* employee) {
+        int id;
+        string name, password;
+        double balance;
+        cout << "Client ID: ";
+        cin >> id;
+        cout << "New name: ";
+        cin >> name;
+        cout << "New password: ";
+        cin >> password;
+        cout << "New balance: ";
+        cin >> balance;
+        if (!FillData::fillClientData(name, password, balance)) {
+            cout << "Invalid data." << endl;
+            return;
+        }
+        employee->editClient(id, name, password, balance);
+    }
+    static Employee* login(int id, string password) {
+        for (int i = 0; i < allEmployees.size(); i++) {
+            if (allEmployees[i].getId() == id && allEmployees[i].getPass() == password)
+                return &allEmployees[i];
+        }
+        return NULL;
+    }
+    static bool employeeOptions(Employee* employee) {
+        int choice;
+        do {
+            printEmployeMenu();
+            cin >> choice;
+            switch (choice) {
+            case 1:
+                newClient(employee);
+                break;
+            case 2:
+                listAllClients(employee);
+                break;
+            case 3:
+                searchForClient(employee);
+                break;
+            case 4:
+                editClientInfo(employee);
+                break;
+            case 5:
+                employee->display();
+                break;
+            case 0:
+                break;
+            default:
+                cout << "Invalid choice." << endl;
+            }
+        } while (choice != 0);
+        return true;
+    }
+};
+
+class AdminManager
+{
+public:
+    static void printEmployeeMenu() {
+        cout << "\nAdmin Menu" << endl;
+        cout << "1 Add client" << endl;
+        cout << "2 List clients" << endl;
+        cout << "3 Search client" << endl;
+        cout << "4 Edit client" << endl;
+        cout << "5 Add employee" << endl;
+        cout << "6 List employees" << endl;
+        cout << "7 Search employee" << endl;
+        cout << "8 Edit employee" << endl;
+        cout << "9 Display my info" << endl;
+        cout << "0 Logout" << endl;
+        cout << "Choice : ";
+    }
+    static Admin* login(int id, string password) {
+        for (int i = 0; i < allAdmins.size(); i++) {
+            if (allAdmins[i].getId() == id && allAdmins[i].getPass() == password)
+                return &allAdmins[i];
+        }
+        return NULL;
+    }
+    static bool AdminOptions(Admin* admin) {
+        int choice;
+        do {
+            printEmployeeMenu();
+            cin >> choice;
+            switch (choice) {
+            case 1:
+                EmployeeManager::newClient(admin);
+                break;
+            case 2:
+                admin->listClient();
+                break;
+            case 3: {
+                int id;
+                cout << "Client ID: ";
+                cin >> id;
+                Client* c = admin->searchClient(id);
+                if (c != NULL) c->display();
+                else cout << "Client not found." << endl;
+                break;
+            }
+            case 4:
+                EmployeeManager::editClientInfo(admin);
+                break;
+            case 5: {
+                string name, password;
+                double salary;
+                cout << "Employee name: ";
+                cin >> name;
+                cout << "Password: ";
+                cin >> password;
+                cout << "Salary: ";
+                cin >> salary;
+                if (!FillData::fillEmployeeData(name, password, salary))
+                    cout << "Invalid data." << endl;
+                else {
+                    Employee e(0, name, password, salary);
+                    admin->addEmployee(e);
+                    cout << "Employee added successfully. ID: " << e.getId() << endl;
+                }
+                break;
+            }
+            case 6:
+                admin->listEmployee();
+                break;
+            case 7: {
+                int id;
+                cout << "Employee ID: ";
+                cin >> id;
+                Employee* e = admin->searchEmployee(id);
+                if (e != NULL) e->display();
+                else cout << "Employee not found." << endl;
+                break;
+            }
+            case 8: {
+                int id;
+                string name, password;
+                double salary;
+                cout << "Employee ID: ";
+                cin >> id;
+                cout << "New name: ";
+                cin >> name;
+                cout << "New password: ";
+                cin >> password;
+                cout << "New salary: ";
+                cin >> salary;
+                if (!FillData::fillEmployeeData(name, password, salary))
+                    cout << "Invalid data." << endl;
+                else
+                    admin->editEmployee(id, name, password, salary);
+                break;
+            }
+            case 9:
+                admin->display();
+                break;
+            case 0:
+                break;
+            default:
+                cout << "Invalid choice." << endl;
+            }
+        } while (choice != 0);
+        return true;
+    }
+};
+
+class Screens
+{
+public:
+    static void bankName() {}
+    static void welcome() {
+        cout << R"(
+__        __ _____  _       ____   ___   __  __ _____ 
+\ \      / /| ____|| |     / ___| / _ \ |  \/  | ____|
+ \ \ /\ / / |  _|  | |    | |    | | | || |\/| |  _|  
+  \ V  V /  | |___ | |___ | |___ | |_| || |  | | |___ 
+   \_/\_/   |_____||_____| \____| \___/ |_|  |_|_____|
+
+             WELCOME TO ROUTE BANK
+)" << endl;
+    }
+    static void loginOptions() {
+        cout << "\nLogin as:" << endl;
+        cout << "1. Client" << endl;
+        cout << "2. Employee" << endl;
+        cout << "3. Admin" << endl;
+        cout << "0. Exit" << endl;
+    }
+    static int loginAs() {
+        int choice;
+        loginOptions();
+        cout << "Choice: ";
+        cin >> choice;
+        return choice;
+    }
+    static void invalid(int) {
+        cout << "Invalid ID, password or choice." << endl;
+    }
+    static void logout() {
+        cout << "Logged out successfully." << endl;
+    }
+    static void loginScreen(int c) {
+        int id;
+        string password;
+        cout << "ID: ";
+        cin >> id;
+        cout << "Password: ";
+        cin >> password;
+        switch (c) {
+        case 1: {
+            Client* client = ClientManager::login(id, password);
+            if (client != NULL) {
+                ClientManager::clientOptions(client);
+                logout();
+            }
+            else invalid(c);
+            break;
+        }
+        case 2: {
+            Employee* employee = EmployeeManager::login(id, password);
+            if (employee != NULL) {
+                EmployeeManager::employeeOptions(employee);
+                logout();
+            }
+            else invalid(c);
+            break;
+        }
+        case 3: {
+            Admin* admin = AdminManager::login(id, password);
+            if (admin != NULL) {
+                AdminManager::AdminOptions(admin);
+                logout();
+            }
+            else invalid(c);
+            break;
+        }
+        default:
+            invalid(c);
+        }
+    }
+    static void runApp() {
+        FileManager fm;
+        fm.getAllClients();
+        fm.getAllEmployees();
+        fm.getAllAdmins();
+
+
+        if (allClients.empty()) {
+            allClients.push_back(Client(1, "Laila Ahmad", "laila12345", 5000));
+            allClients.push_back(Client(2, "Nour Adel", "nour12345", 9000));
+            allClients.push_back(Client(3, "Omar mahran", "omar123456", 6400));
+            allClients.push_back(Client(4, "Salma Nabil", "salma12345", 5500));
+            allClients.push_back(Client(5, "Adham Tarek", "adham12345", 7000));
+            allClients.push_back(Client(6, "Mariam Ali", "mariam12345", 1800));
+            allClients.push_back(Client(7, "Ziad Mostafa", "ziad12345", 3000));
+            allClients.push_back(Client(8, "Gana Mohamed", "gana123456", 5000));
+            allClients.push_back(Client(9, "Jana Fathi", "jana12345", 10000));
+            FilesHelper::saveAllClients();
+            FilesHelper::saveLast("ClientLastId.txt", 9);
+        }
+
+        if (allAdmins.empty()) {
+            Admin admin(1, "BankAdmin", "bank12345", 15000);
+            allAdmins.push_back(admin);
+            FilesHelper::saveAdmin(admin);
+        }
+
+        bankName();
+        welcome();
+        int choice;
+        do {
+            choice = loginAs();
+            switch (choice) {
+            case 1:
+            case 2:
+            case 3:
+                loginScreen(choice);
+                break;
+            case 0:
+                break;
+            default:
+                invalid(choice);
+            }
+        } while (choice != 0);
+        cout << "Thank you for using our bank" << endl;
+    }
+};
+
+int main() {
+    Screens::runApp();
+}
